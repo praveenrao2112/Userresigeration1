@@ -2,88 +2,40 @@ package com.example.Userresigeration.service;
 
 import com.example.Userresigeration.model.User;
 import com.example.Userresigeration.repository.UserRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
-
-/**
- * Service layer for handling user registration and SSO user provisioning.
- */
 @Service
 public class UserService {
 
-    private final UserRepository repo;
-    private final PasswordEncoder passwordEncoder;
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
-    // ✅ Constructor injection (Spring Boot automatically injects beans)
-    public UserService(UserRepository repo, PasswordEncoder passwordEncoder) {
-        this.repo = repo;
-        this.passwordEncoder = passwordEncoder;
-    }
+    @Autowired
+    private UserRepository userRepository;
 
-    /**
-     * Registers a new farmer account (normal registration, not SSO).
-     *
-     * @param name        Farmer's name
-     * @param email       Farmer's email (must be unique)
-     * @param rawPassword Raw password (will be encoded)
-     * @return Saved User entity
-     */
-    public User registerFarmer(String name, String email, String rawPassword) {
-        // Check if email already exists
-        if (repo.findByEmail(email).isPresent()) {
-            throw new IllegalArgumentException("Email already registered");
-        }
+    public User registerFarmer(String name, String email, String password) {
+        logger.info("Registering new user with email: {}", email);
+        try {
 
-        // Build new User entity
-        User user = new User();
-        user.setName(name);
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(rawPassword));
-        user.setRole("ROLE_FARMER");
-        user.setEnabled(true);
-        user.setOauth2(false);
-
-        // Save in database
-        return repo.save(user);
-    }
-
-    /**
-     * Creates or updates a user after OAuth2 (Google/Keycloak) login.
-     * This ensures SSO users are automatically registered in the DB.
-     *
-     * @param name  Name from OAuth provider
-     * @param email Email from OAuth provider
-     * @return Saved or updated User
-     */
-    public User createOrUpdateOAuthUser(String name, String email) {
-        Optional<User> existing = repo.findByEmail(email);
-
-        if (existing.isPresent()) {
-            User user = existing.get();
-            user.setName(name);
-            user.setOauth2(true);
-            if (user.getRole() == null) {
-                user.setRole("ROLE_FARMER");
+            if (userRepository.existsByEmail(email)) {
+                logger.warn("Registration failed: email {} already exists", email);
+                throw new RuntimeException("Email already registered");
             }
-            return repo.save(user);
-        } else {
+
             User newUser = new User();
             newUser.setName(name);
             newUser.setEmail(email);
-            newUser.setPassword(null); // no password for OAuth users
-            newUser.setRole("ROLE_FARMER");
-            newUser.setEnabled(true);
-            newUser.setOauth2(true);
-            return repo.save(newUser);
-        }
-    }
+            newUser.setPassword(password); // NOTE: ideally encode passwords before saving
 
-    /**
-     * Finds a user by email.
-     */
-    public Optional<User> findByEmail(String email) {
-        return repo.findByEmail(email);
+            User savedUser = userRepository.save(newUser);
+            logger.info("User {} registered successfully", email);
+            return savedUser;
+
+        } catch (Exception e) {
+            logger.error("Error registering user with email {}", email, e);
+            throw new RuntimeException("User registration failed", e);
+        }
     }
 }

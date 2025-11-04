@@ -5,18 +5,18 @@ import lombok.*;
 
 @Entity
 @Table(name = "users")
-@Data                 // ✅ generates getters/setters
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder              // ✅ generates builder() and field methods
+@Builder
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;      // ✅ builder().name()
-    private String email;     // ✅ builder().email()
+    private String name;
+    private String email;
     private String password;
     private String role;
     private boolean enabled;

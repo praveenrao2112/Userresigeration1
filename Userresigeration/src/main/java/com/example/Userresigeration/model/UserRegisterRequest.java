@@ -1,11 +1,10 @@
-package com.example.Userresigeration.controller;
+package com.example.Userresigeration.model;
 
 class UserRegisterRequest {
     private String name;
     private String email;
     private String password;
 
-    // ✅ getters and setters
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 

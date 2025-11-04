@@ -1,6 +1,8 @@
 package com.example.Userresigeration.config;
 
 import com.example.Userresigeration.service.CustomOAuth2UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,26 +17,28 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
     private final CustomOAuth2UserService customOAuth2UserService;
 
     public SecurityConfig(CustomOAuth2UserService customOAuth2UserService) {
         this.customOAuth2UserService = customOAuth2UserService;
     }
 
-    /** Password encoder for form registration/login */
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /** Allow React dev server to call backend */
+
     @Bean
     public WebMvcConfigurer corsConfigurer() {
+        logger.info("Configuring CORS for frontend: http://localhost:5173");
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:5173")
+                        .allowedOrigins("http://localhost:5173") // ⚙️ change to env var in prod
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
@@ -42,44 +46,42 @@ public class SecurityConfig {
         };
     }
 
-    /** Core Spring Security config */
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        logger.info("Initializing Spring Security filter chain...");
 
         http
-                // Disable CSRF for dev / REST APIs
+
                 .csrf(csrf -> csrf.disable())
 
-                // Public endpoints
+
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/register",
                                 "/api/auth/login",
+                                "/api/auth/success",
+                                "/api/auth/failure", // added failure endpoint
                                 "/oauth2/**",
                                 "/login/**",
-                                "/h2-console/**"
+                                "/h2-console/**",
+                                "/error" // allow Spring Boot default error path
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
 
-                // H2 console display
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
-                // OAuth2 login (Google)
                 .oauth2Login(oauth2 -> oauth2
-                        // Entry point to trigger login
                         .loginPage("/oauth2/authorization/google")
-
-                        // Where to fetch user info
                         .userInfoEndpoint(userInfo ->
                                 userInfo.userService(customOAuth2UserService)
                         )
-
-                        // Redirect after successful login
                         .defaultSuccessUrl("/api/auth/success", true)
+                        .failureUrl("/api/auth/failure") // 👈 custom failure page
                 )
 
-                // Logout config (optional)
+
                 .logout(logout -> logout
                         .logoutUrl("/logout")
                         .logoutSuccessUrl("http://localhost:5173")
@@ -87,6 +89,7 @@ public class SecurityConfig {
                         .deleteCookies("JSESSIONID")
                 );
 
+        logger.info("Security filter chain successfully initialized.");
         return http.build();
     }
 }
